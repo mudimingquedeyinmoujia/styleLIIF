@@ -1,0 +1,20 @@
+conf1: none
+conf2: 121
+conf3: haxue
+conf4: 0.0001
+conf5:
+- 22
+- '323'
+- 23
+- 23
+- 23
+conf6:
+- sdfj
+- dasfa
+- adfa
+- adfa
+conf7: None
+conf8: false
+conf9: false
+conf10: true
+conf11: true

@@ -47,17 +47,18 @@ kimg: none
 
 ## 4. discriminator augmentation
 # aug: augment mode. str [ada,noaug,fixed]
-aug: ada
+aug: fixed
 # p: augmentation probability for aug=fixed. [float]
-p: none
+p: 0
 # target: ada target value for aug=ada. [float]
 target: none
 # augpipe: augment pipeline. str [blit,geom,color,filter,noise,cutout,bg,bgc,bgcf,bgcfn,bgcfnc]
 augpipe: bgc
+ada_kimg: 1000
 
 ## 5. transfer learning
 # resume: resume training. str path
-resume: none
+resume: null
 
 ## 6. performance options
 # fp32: disable mixed-precision training. [bool]

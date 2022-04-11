@@ -1,3 +1,0 @@
-train dataset: size=70000
-Image shape: [3, 256, 256]
-Label shape: [0]

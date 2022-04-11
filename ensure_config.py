@@ -42,13 +42,6 @@ augpipe_specs = {
                    lumaflip=1, hue=1, saturation=1, imgfilter=1, noise=1, cutout=1),
 }
 
-resume_specs = {
-    'ffhq256': 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl',
-    'ffhq512': 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/ffhq-res512-mirror-stylegan2-noaug.pkl',
-    'ffhq1024': 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/ffhq-res1024-mirror-stylegan2-noaug.pkl',
-    'celebahq256': 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/celebahq-res256-mirror-paper256-kimg100000-ada-target0.5.pkl',
-    'lsundog256': 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/lsundog-res256-paper256-kimg100000-noaug.pkl',
-}
 
 
 def ensure_config(config):
@@ -143,19 +136,7 @@ def ensure_config(config):
         # new add
         config['model-Aug']['args'] = augpipe_specs[config['augpipe']]
 
-    config['resume_pkl']=None
-    # new add config['resume_pkl']
-    if isNone(config['resume']):
-        config['resume'] = 'noresume'
-    elif config['resume'] in resume_specs:
-        config['resume_pkl'] = resume_specs[config['resume']]
-    else:
-        config['resume_pkl'] = config['resume']
 
-    # new add, new change
-    if config['resume'] != 'noresume':
-        config['ada_kimg'] = 100
-        config['ema_rampup'] = None
 
     if isNone(config['fp32']):
         config['fp32'] = False

@@ -51,15 +51,16 @@ def make_data_loaders():
 
 def prepare_training(device):
     if config['resume'] is None:
-        G = models.make(config['model-G']).train().requires_grad_(False).cuda()
-        D = models.make(config['model-D']).train().requires_grad_(False).cuda()
+        G = models.make(config['model-G']).train().requires_grad_(False).to(device)
+        D = models.make(config['model-D']).train().requires_grad_(False).to(device)
         G_ema = copy.deepcopy(G).eval()  # for evaluate
         cur_tick = 0
     else:
         sv_file = torch.load(config['resume'])
-        G = models.make(sv_file['model-G'], load_sd=True).train().requires_grad_(False).cuda()
-        D = models.make(sv_file['model-D'], load_sd=True).train().requires_grad_(False).cuda()
-        G_ema = copy.deepcopy(G).load_state_dict(sv_file['model-G']['sd_ema']).eval()
+        G = models.make(sv_file['G'], load_sd=True).train().requires_grad_(False).to(device)
+        D = models.make(sv_file['D'], load_sd=True).train().requires_grad_(False).to(device)
+        G_ema = copy.deepcopy(G).eval()
+        G_ema.load_state_dict(sv_file['G']['sd_ema'])
         cur_tick = sv_file['cur_tick']
 
     # todo: distribute
@@ -95,42 +96,7 @@ def prepare_training(device):
     return G, D, G_ema, loss, phases, cur_tick
 
 
-def train(train_loader, model, optimizer):
-    model.train()
-    loss_fn = nn.L1Loss()
-    train_loss = utils.Averager()
-
-    data_norm = config['data_norm']
-    t = data_norm['inp']
-    inp_sub = torch.FloatTensor(t['sub']).view(1, -1, 1, 1).cuda()
-    inp_div = torch.FloatTensor(t['div']).view(1, -1, 1, 1).cuda()
-    t = data_norm['gt']
-    gt_sub = torch.FloatTensor(t['sub']).view(1, 1, -1).cuda()
-    gt_div = torch.FloatTensor(t['div']).view(1, 1, -1).cuda()
-
-    for batch in tqdm(train_loader, leave=False, desc='train'):
-        for k, v in batch.items():
-            batch[k] = v.cuda()
-
-        inp = (batch['inp'] - inp_sub) / inp_div
-        pred = model(inp, batch['coord'], batch['cell'])
-
-        gt = (batch['gt'] - gt_sub) / gt_div
-        loss = loss_fn(pred, gt)
-
-        train_loss.add(loss.item())
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        pred = None;
-        loss = None
-
-    return train_loss.item()  # 每次迭代的loss做一个平均，作为此次epoch的loss
-
-
-def main(config_, save_path):
+def main(config_, save_path, device):
     global config, log, writer
     config = ensure_config.ensure_config(config_)
     log, writer = utils.set_save_path(save_path)
@@ -151,18 +117,16 @@ def main(config_, save_path):
     train_loader, training_set = make_data_loaders()
     training_set_iterator = iter(train_loader)
     # phase_real_img,phase_real_label=next(training_set_iterator)
-    device = torch.device('cuda:0')
     G, D, G_ema, loss, phases, cur_tick_ = prepare_training(device)
 
     # init save
     batch_sz = config['train_dataset']['batch_size']
     grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
-    save_image_grid(images, os.path.join(save_path, 'reals.png'), drange=[0, 255], grid_size=grid_size)
-    grid_z = torch.randn([labels.shape[0], G.z_dim]).cuda().split(batch_sz)  # dim 0 = batch_gpu
-    grid_c = torch.from_numpy(labels).cuda().split(batch_sz)
+    # save_image_grid(images, os.path.join(save_path, 'reals.png'), drange=[0, 255], grid_size=grid_size)
+    grid_z = torch.randn([labels.shape[0], G.z_dim]).to(device).split(batch_sz)  # dim 0 = batch_gpu
+    grid_c = torch.from_numpy(labels).to(device).split(batch_sz)
     images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
     save_image_grid(images, os.path.join(save_path, 'fakes_init.png'), drange=[-1, 1], grid_size=grid_size)
-
 
     # start training
     cur_nimg = 0
@@ -232,7 +196,6 @@ def main(config_, save_path):
         cur_nimg += batch_size
         batch_idx += 1
 
-
         done = (cur_nimg >= total_kimg * 1000)
         if (not done) and (cur_tick != 0) and (cur_nimg < tick_start_nimg + kimg_per_tick * 1000):
             continue
@@ -289,14 +252,13 @@ def main(config_, save_path):
 if __name__ == '__main__':
     # init yaml / save dir / gpu nums
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/train-ffhq/train_ffhq_styleGAN2_01.yaml')
+    parser.add_argument('--config', default='configs/train-ffhq/train_ffhq_styleGAN2_01_resu.yaml')
     parser.add_argument('--name', default=None)
-    parser.add_argument('--tag', default=None)
-    parser.add_argument('--gpu', default='0')
+    parser.add_argument('--tag', default='1400kimg')
+    parser.add_argument('--gpu', default='cuda:0')
     args = parser.parse_args()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-
+    device = torch.device(args.gpu)
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
         print('config loaded.')
@@ -308,4 +270,4 @@ if __name__ == '__main__':
         save_name += '_' + args.tag
     save_path = os.path.join('./save/exp1', save_name)
 
-    main(config, save_path)
+    main(config, save_path, device)
